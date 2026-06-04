@@ -47,9 +47,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
+    jwt({ token, user }) {
+      if (user?.id) {
+        token.id = user.id;
+      }
+
+      return token;
+    },
     session({ session, token }) {
-      if (session.user && token.sub) {
-        (session.user as typeof session.user & { id: string }).id = token.sub;
+      const id = typeof token.id === "string" ? token.id : token.sub;
+
+      if (session.user && id) {
+        (session.user as typeof session.user & { id: string }).id = id;
       }
 
       return session;

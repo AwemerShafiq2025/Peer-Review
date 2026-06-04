@@ -40,7 +40,6 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
   const [statusMsg, setStatusMsg] = useState("");
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [tab, setTab] = useState<"decision" | "reviews">("decision");
-  const [savePromptDismissed, setSavePromptDismissed] = useState(false);
   const [currentPaperTitle, setCurrentPaperTitle] = useState("Untitled Paper");
   const resultsRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
@@ -61,6 +60,11 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
   });
 
   async function startReview(paperText: string, q: Quartile) {
+    if (!isAuthenticated) {
+      setFatalError("Please sign in to submit a review.");
+      return;
+    }
+
     showToast("Review started - panel is reading your manuscript", "info");
     setRunning(true);
     setStarted(true);
@@ -68,7 +72,6 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
     setEditorStatus("idle");
     setVerdict(undefined);
     setFatalError(null);
-    setSavePromptDismissed(false);
     setCurrentPaperTitle(paperText.split(/\r?\n/)[0]?.trim().slice(0, 120) || "Untitled Paper");
     setQuartile(q);
     setTab("decision");
@@ -159,7 +162,7 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
       <section className="mx-auto max-w-6xl px-6 pb-10 pt-16 sm:pt-24">
         <div className="mx-auto max-w-3xl text-center">
           <span className="chip mx-auto mb-6 animate-fadeUp">
-            <IconSpark width={15} height={15} className="text-accent" /> Five distinct AI models · one editorial verdict
+            <IconSpark width={15} height={15} className="text-accent" /> Independent review panel · one editorial verdict
           </span>
           <h1 className="animate-fadeUp text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
             A peer-review panel for <span className="text-accent">any</span> scientific paper.
@@ -192,7 +195,7 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
             {
               icon: <IconUser width={22} height={22} />,
               t: "2 · Four reviewers",
-              d: "Four reviewer twins — each a different model with its own focus — read the paper in parallel.",
+              d: "Four reviewer twins with distinct expert focus areas read the paper in parallel.",
             },
             {
               icon: <IconGavel width={22} height={22} />,
@@ -215,8 +218,8 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
       <section id="panel" className="mx-auto max-w-6xl px-6 py-8">
         <h2 className="text-2xl font-bold">Meet the panel</h2>
         <p className="mt-1.5 text-text-secondary">
-          Every reviewer is powered by a different model, so the panel reasons from genuinely
-          independent vantage points.
+          Each reviewer brings a distinct focus, so the panel reasons from genuinely independent
+          vantage points.
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {PANEL.map((r) => (
@@ -230,7 +233,6 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
               <h3 className="mt-3 font-semibold">{r.name}</h3>
               <p className="text-sm text-accent">{r.role}</p>
               <p className="mt-2 text-xs leading-relaxed text-text-tertiary">{r.blurb}</p>
-              <span className="chip mt-3 !py-0.5 !text-xs font-mono">{r.modelLabel}</span>
             </div>
           ))}
         </div>
@@ -246,8 +248,7 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
               {EDITOR.name} <span className="font-normal text-text-tertiary">· {EDITOR.role}</span>
             </p>
             <p className="text-sm text-text-secondary">
-              A fifth model synthesises all four reviews into the final decision.{" "}
-              <span className="font-mono text-xs text-text-tertiary">{EDITOR.modelLabel}</span>
+              The handling editor synthesises all four reviews into the final decision.
             </p>
           </div>
         </div>
@@ -256,7 +257,27 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
       {/* Submit */}
       <section id="submit" className="mx-auto max-w-3xl px-6 py-12">
         <h2 className="mb-6 text-center text-2xl font-bold">Submit your paper</h2>
-        <UploadForm busy={running} onSubmit={startReview} />
+        {isAuthenticated ? (
+          <UploadForm busy={running} onSubmit={startReview} isLoggedIn={isAuthenticated} />
+        ) : (
+          <div className="card p-6 text-center sm:p-8">
+            <span className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-accent/15 text-accent">
+              <IconUser width={22} height={22} />
+            </span>
+            <h3 className="mt-4 text-xl font-semibold">Please sign in to use the review panel</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-text-secondary">
+              Reviews are saved to your account history, so the panel is available after sign in.
+            </p>
+            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+              <a href="/login" className="btn-primary">
+                Sign In
+              </a>
+              <a href="/register" className="btn-outline">
+                Create Account
+              </a>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Results */}
@@ -285,22 +306,6 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
             {fatalError && (
               <div className="card border-rose-400/30 bg-rose-500/5 p-5 text-rose-300">
                 {fatalError}
-              </div>
-            )}
-
-            {verdict && !isAuthenticated && !savePromptDismissed && (
-              <div className="flex items-center justify-between gap-4 rounded-md border border-accent/25 bg-accent/10 p-4 text-sm text-accent">
-                <a href="/login" className="font-medium transition-colors hover:text-accent-glow">
-                  Sign in to save your reviews and access them anytime -&gt; Sign In
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setSavePromptDismissed(true)}
-                  aria-label="Dismiss save prompt"
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-secondary transition-colors hover:bg-white/10 hover:text-text-primary"
-                >
-                  X
-                </button>
               </div>
             )}
 

@@ -66,5 +66,5 @@ export const EDITOR = {
 };
 
 export function publicReviewers() {
-  return REVIEWERS.map(({ model, ...rest }) => rest);
+  return REVIEWERS.map(({ model, modelLabel, ...rest }) => rest);
 }

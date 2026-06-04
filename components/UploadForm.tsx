@@ -87,9 +87,11 @@ function charStatus(chars: number) {
 export default function UploadForm({
   busy,
   onSubmit,
+  isLoggedIn = true,
 }: {
   busy: boolean;
   onSubmit: (paperText: string, quartile: Quartile) => void;
+  isLoggedIn?: boolean;
 }) {
   const [mode, setMode] = useState<"file" | "paste">("file");
   const [fileName, setFileName] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export default function UploadForm({
 
   const text = mode === "file" ? paperText : pasted;
   const chars = text.trim().length;
-  const ready = chars >= MIN_CHARS && !!quartile && !busy && !extracting;
+  const ready = isLoggedIn && chars >= MIN_CHARS && !!quartile && !busy && !extracting;
   const charInfo = charStatus(chars);
   const charProgress = Math.min(100, (chars / MAX_CHARS) * 100);
 
@@ -142,6 +144,10 @@ export default function UploadForm({
 
   function submit() {
     setError(null);
+    if (!isLoggedIn) {
+      setError("Please sign in to use the review panel.");
+      return;
+    }
     if (chars < MIN_CHARS) {
       setError("Please provide the manuscript text (at least ~300 characters).");
       return;
@@ -320,7 +326,7 @@ export default function UploadForm({
         )}
       </button>
       <p className="mt-3 text-center text-xs text-text-tertiary">
-        Four independent reviewer models + a handling editor - ~30-60 seconds
+        Four independent reviewers + a handling editor - ~30-60 seconds
       </p>
     </div>
   );

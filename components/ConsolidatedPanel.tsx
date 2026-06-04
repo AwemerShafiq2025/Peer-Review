@@ -84,7 +84,6 @@ export default function ConsolidatedPanel({
             <thead>
               <tr className="border-b border-subtle text-xs uppercase tracking-wide text-text-tertiary">
                 <th className="p-4 font-medium">Reviewer</th>
-                <th className="p-4 font-medium">Model</th>
                 <th className="p-4 font-medium">Recommendation</th>
                 <th className="p-4 text-right font-medium">Score</th>
                 <th className="p-4 text-right font-medium">Conf.</th>
@@ -106,9 +105,6 @@ export default function ConsolidatedPanel({
                           <div className="text-xs text-text-tertiary">{r.role}</div>
                         </div>
                       </div>
-                    </td>
-                    <td className="p-4">
-                      <span className="font-mono text-xs text-text-secondary">{r.modelLabel}</span>
                     </td>
                     <td className="p-4">
                       <StatusCell s={s} />

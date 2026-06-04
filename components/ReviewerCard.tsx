@@ -62,7 +62,6 @@ export default function ReviewerCard({
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold leading-tight">{reviewer.name}</h3>
           <p className="text-sm text-text-secondary">{reviewer.role}</p>
-          <span className="chip mt-2 !py-0.5 !text-xs font-mono">{reviewer.modelLabel}</span>
         </div>
         {status === "done" && review && (
           <div className="shrink-0 text-right">

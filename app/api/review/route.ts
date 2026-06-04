@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { sql } from "@/lib/db";
-import { REVIEWERS, EDITOR } from "@/lib/reviewers";
+import { REVIEWERS, EDITOR, publicReviewers } from "@/lib/reviewers";
 import { complete, extractJson } from "@/lib/nvidia";
 import {
   buildReviewerSystem,
@@ -31,6 +31,8 @@ export const maxDuration = 60;
 // rest rather than the whole request hanging.
 const REVIEWER_TIMEOUT_MS = Number(process.env.REVIEWER_TIMEOUT_MS) || 40_000;
 const EDITOR_TIMEOUT_MS = Number(process.env.EDITOR_TIMEOUT_MS) || 18_000;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const RATE_LIMIT_MAX = 5;
 
 const QUARTILES: Quartile[] = ["Q1", "Q2", "Q3", "Q4"];
 // Cap the manuscript size to keep latency and token cost sane. ~60k chars is
@@ -39,6 +41,7 @@ const MAX_CHARS = 60_000;
 
 const RECS: Recommendation[] = ["Accept", "Minor Revision", "Major Revision", "Reject"];
 const DECISIONS: FinalDecision[] = ["Accepted", "Minor Revision", "Major Revision", "Rejected"];
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function clampNum(n: unknown, min: number, max: number, fallback: number): number {
   const v = typeof n === "number" ? n : Number(n);
@@ -221,7 +224,7 @@ async function saveReview({
 }) {
   const paperTitle = extractPaperTitle(paperText);
   const avgScore = averageScore(completed);
-  const panel = REVIEWERS.map(({ model, ...reviewer }) => reviewer);
+  const panel = publicReviewers();
   const fullResult = {
     verdict,
     reviews: completed.map(({ reviewer, review }) => ({
@@ -231,22 +234,78 @@ async function saveReview({
     quartile,
     panel,
   };
+  const fullResultJson = JSON.stringify(fullResult);
+  const insertValues = {
+    userId,
+    paperTitle,
+    quartile,
+    verdict: verdict.decision,
+    avgScore,
+    fullResult,
+  };
 
-  await sql`
-    INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result)
-    VALUES (
-      ${userId},
-      ${paperTitle},
-      ${quartile},
-      ${verdict.decision},
-      ${avgScore},
-      ${JSON.stringify(fullResult)}::jsonb
-    )
-  `;
+  console.log("Saving review with SQL:", {
+    sql:
+      "INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result) VALUES ($1, $2, $3, $4, $5, $6::jsonb)",
+    values: insertValues,
+  });
+
+  try {
+    await sql`
+      INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result)
+      VALUES (
+        ${userId},
+        ${paperTitle},
+        ${quartile},
+        ${verdict.decision},
+        ${avgScore},
+        ${fullResultJson}::jsonb
+      )
+    `;
+  } catch (err) {
+    console.error("Review INSERT failed:", {
+      error: err,
+      sql:
+        "INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result) VALUES ($1, $2, $3, $4, $5, $6::jsonb)",
+      values: insertValues,
+    });
+    throw err;
+  }
+}
+
+function checkRateLimit(userId: string) {
+  const now = Date.now();
+  const current = rateLimitBuckets.get(userId);
+
+  if (!current || current.resetAt <= now) {
+    rateLimitBuckets.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (current.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+
+  current.count += 1;
+  return true;
 }
 
 export async function POST(req: NextRequest) {
   const session = await auth();
+  console.log("Review POST session:", session);
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+
+  if (!session?.user || !userId) {
+    return new Response(JSON.stringify({ error: "Please sign in to submit a review." }), { status: 401 });
+  }
+
+  if (!checkRateLimit(userId)) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests. Please wait before submitting another review." }),
+      { status: 429 }
+    );
+  }
+
   let body: any;
   try {
     body = await req.json();
@@ -256,7 +315,6 @@ export async function POST(req: NextRequest) {
 
   const paperText = String(body?.paperText ?? "").trim();
   const quartile = body?.quartile as Quartile;
-  const userId = (session?.user as { id?: string } | undefined)?.id;
 
   if (paperText.length < 300) {
     return new Response(
@@ -284,8 +342,7 @@ export async function POST(req: NextRequest) {
 
       try {
         send({ type: "status", message: "Briefing the review panel…" });
-        for (const r of REVIEWERS) {
-          const { model, ...pub } = r;
+        for (const pub of publicReviewers()) {
           send({ type: "reviewer_start", reviewer: pub });
         }
 
@@ -340,13 +397,15 @@ export async function POST(req: NextRequest) {
 
         send({ type: "editor_done", verdict });
 
-        if (userId) {
-          try {
-            await saveReview({ userId, paperText: trimmed, quartile, verdict, completed });
-            send({ type: "review_saved" });
-          } catch (err) {
-            console.error("Failed to save review:", err);
-          }
+        try {
+          await saveReview({ userId, paperText: trimmed, quartile, verdict, completed });
+          send({ type: "review_saved" });
+        } catch (err) {
+          console.error("Failed to save review:", err);
+          send({
+            type: "error",
+            message: "The review completed, but it could not be saved to your history. Please try again.",
+          });
         }
       } catch (err: any) {
         send({ type: "error", message: err?.message ? String(err.message) : "Unexpected server error." });

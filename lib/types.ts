@@ -49,7 +49,7 @@ export interface ReviewerConfig {
   blurb: string;
   /** NVIDIA NIM model id powering this reviewer. */
   model: string;
-  /** Friendly model label shown in the UI. */
+  /** Friendly internal model label for logs/debugging only. */
   modelLabel: string;
   /** Accent hue used for this reviewer's card. */
   hue: string;
@@ -77,7 +77,5 @@ export type StreamEvent =
   | { type: "review_saved" }
   | { type: "error"; message: string };
 
-/** Reviewer config minus anything we don't want to expose verbatim. */
-export type PublicReviewer = Omit<ReviewerConfig, "model"> & {
-  modelLabel: string;
-};
+/** Reviewer config minus anything we don't want to expose to the browser. */
+export type PublicReviewer = Omit<ReviewerConfig, "model" | "modelLabel">;
