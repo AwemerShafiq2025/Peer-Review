@@ -15,7 +15,7 @@ export const REVIEWERS: ReviewerConfig[] = [
     role: "Methodology & Rigor",
     blurb:
       "Scrutinises study design, statistics, controls, sample sizes and whether the methods can actually answer the research question.",
-    model: "meta/llama-3.3-70b-instruct",
+    model: "nemotron-3-ultra-550b-a55b",
     modelLabel: "Reviewer A",
     hue: "#4D9BFF",
   },
@@ -25,7 +25,7 @@ export const REVIEWERS: ReviewerConfig[] = [
     role: "Novelty & Significance",
     blurb:
       "Weighs the contribution against the existing literature — is this new, important, and positioned correctly within the field?",
-    model: "mistralai/mistral-large-2-instruct",
+    model: "kimi-k2.6",
     modelLabel: "Reviewer B",
     hue: "#00D4FF",
   },
@@ -35,7 +35,7 @@ export const REVIEWERS: ReviewerConfig[] = [
     role: "Results & Validity",
     blurb:
       "Checks whether the claims are actually supported by the evidence, hunts for over-claiming, confounds and unaddressed limitations.",
-    model: "nvidia/llama-3.1-nemotron-70b-instruct",
+    model: "glm-5.1",
     modelLabel: "Reviewer C",
     hue: "#A78BFA",
   },
