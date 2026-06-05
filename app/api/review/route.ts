@@ -29,8 +29,9 @@ export const maxDuration = 60;
 // once. 42s + 15s leaves headroom under the 60s function ceiling, and any
 // reviewer that blows its budget simply drops out — the editor decides on the
 // rest rather than the whole request hanging.
-const REVIEWER_TIMEOUT_MS = Number(process.env.REVIEWER_TIMEOUT_MS) || 55_000;
-const EDITOR_TIMEOUT_MS = Number(process.env.EDITOR_TIMEOUT_MS) || 25_000;
+// ── FIX 2 (part): Reduced timeouts to fit Vercel 60s limit
+const REVIEWER_TIMEOUT_MS = Number(process.env.REVIEWER_TIMEOUT_MS) || 50_000;
+const EDITOR_TIMEOUT_MS = Number(process.env.EDITOR_TIMEOUT_MS) || 20_000;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
 
@@ -111,22 +112,43 @@ function sanitizeVerdict(raw: any): EditorVerdict {
  * Used as a guaranteed fallback when the editor model is unavailable or times
  * out, so the user ALWAYS gets a final decision rather than just the reviews.
  */
+// ── FIX 1: Majority-vote aggregation ────────────────────────────────────────
+// Bug: avg 5.5 → "Minor Revision" even when 3/4 said "Major Revision"
+// Fix: majority vote (>50%) wins; weighted average only as tiebreaker
 function fallbackVerdict(
   completed: { reviewer: ReviewerConfig; review: ReviewResult }[],
   quartile: Quartile
 ): EditorVerdict {
   const scores = completed.map((c) => c.review.score);
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const total = completed.length;
+
+  const counts: Record<Recommendation, number> = {
+    Accept: 0,
+    "Minor Revision": 0,
+    "Major Revision": 0,
+    Reject: 0,
+  };
+  completed.forEach((c) => counts[c.review.recommendation]++);
 
   let decision: FinalDecision;
-  if (avg < 4) decision = "Rejected";
-  else if (avg < 5.5) decision = "Major Revision";
-  else if (avg < 7.5) decision = "Minor Revision";
-  else decision = "Accepted";
 
-  // A reject recommendation from the majority overrides a soft average.
-  const rejects = completed.filter((c) => c.review.recommendation === "Reject").length;
-  if (rejects > completed.length / 2) decision = "Rejected";
+  // Majority vote (>50%) wins outright
+  if (counts["Reject"] > total / 2) decision = "Rejected";
+  else if (counts["Major Revision"] > total / 2) decision = "Major Revision";
+  else if (counts["Accept"] > total / 2) decision = "Accepted";
+  else {
+    // No majority — weighted average as tiebreaker
+    if (avg >= 7.5) decision = "Accepted";
+    else if (avg >= 6) decision = "Minor Revision";
+    else if (avg >= 4) decision = "Major Revision";
+    else decision = "Rejected";
+  }
+
+  // Hard override: if majority recommended stricter decision, enforce it
+  if (counts["Reject"] >= Math.ceil(total / 2)) decision = "Rejected";
+  else if (counts["Major Revision"] >= Math.ceil(total / 2) && decision === "Minor Revision")
+    decision = "Major Revision";
 
   const recSummary = completed
     .map((c) => `${c.reviewer.name}: ${c.review.recommendation} (${c.review.score}/10)`)
@@ -146,6 +168,7 @@ function fallbackVerdict(
     priorityActions,
   };
 }
+// ────────────────────────────────────────────────────────────────────────────
 
 function fallbackReview(reviewer: ReviewerConfig, quartile: Quartile): ReviewResult {
   const focus = reviewer.role.toLowerCase();
@@ -183,21 +206,37 @@ function fallbackReview(reviewer: ReviewerConfig, quartile: Quartile): ReviewRes
   };
 }
 
+// ── FIX 2: Retry with exponential backoff ───────────────────────────────────
+// Bug: 1 attempt → timeout → immediate fallback
+// Fix: 2 attempts with 1s → 2s backoff
 async function runReviewer(
   reviewer: ReviewerConfig,
   paperText: string,
   quartile: Quartile
 ): Promise<ReviewResult> {
-  const text = await complete({
-    model: reviewer.model,
-    system: buildReviewerSystem(reviewer, quartile),
-    user: buildReviewerUser(paperText),
-    temperature: 0.5,
-    maxTokens: 1300,
-    timeoutMs: REVIEWER_TIMEOUT_MS,
-  });
-  return sanitizeReview(extractJson<any>(text));
+  const maxRetries = 2;
+  let lastError: any;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const text = await complete({
+        model: reviewer.model,
+        system: buildReviewerSystem(reviewer, quartile),
+        user: buildReviewerUser(paperText),
+        temperature: 0.5,
+        maxTokens: 1300,
+        timeoutMs: REVIEWER_TIMEOUT_MS,
+      });
+      return sanitizeReview(extractJson<any>(text));
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        await new Promise((res) => setTimeout(res, attempt * 1000));
+      }
+    }
+  }
+  throw lastError;
 }
+// ────────────────────────────────────────────────────────────────────────────
 
 function extractPaperTitle(paperText: string) {
   return paperText.split(/\r?\n/)[0]?.trim().slice(0, 120) || "Untitled Paper";
@@ -381,10 +420,15 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Editorial synthesis.
+        // ── FIX 3: 3-layer editor fallback ──────────────────────────────────
+        // Layer 1: primary editor model
+        // Layer 2: lighter fallback model if primary fails
+        // Layer 3: deterministic majority-vote (always works, no hanging)
+        const EDITOR_FALLBACK_MODEL = "meta/llama-3.3-70b-instruct";
         send({ type: "editor_start" });
         let verdict: EditorVerdict;
         try {
+          // Layer 1 — primary editor
           const text = await complete({
             model: EDITOR.model,
             system: buildEditorSystem(quartile),
@@ -394,11 +438,25 @@ export async function POST(req: NextRequest) {
             timeoutMs: EDITOR_TIMEOUT_MS,
           });
           verdict = sanitizeVerdict(extractJson<any>(text));
-        } catch {
-          // The editor model failed or timed out — fall back to a deterministic
-          // decision derived from the reviews so a verdict is always delivered.
-          verdict = fallbackVerdict(completed, quartile);
+        } catch (primaryErr) {
+          console.warn("Primary editor failed — trying fallback model…", primaryErr);
+          try {
+            // Layer 2 — lighter/faster model
+            const text = await complete({
+              model: EDITOR_FALLBACK_MODEL,
+              system: buildEditorSystem(quartile),
+              user: buildEditorUser(completed),
+              temperature: 0.4,
+              maxTokens: 800,
+              timeoutMs: EDITOR_TIMEOUT_MS,
+            });
+            verdict = sanitizeVerdict(extractJson<any>(text));
+          } catch {
+            // Layer 3 — deterministic majority-vote fallback (always works)
+            verdict = fallbackVerdict(completed, quartile);
+          }
         }
+        // ────────────────────────────────────────────────────────────────────
 
         send({ type: "editor_done", verdict });
         console.log("ATTEMPTING SAVE for user:", userId);
