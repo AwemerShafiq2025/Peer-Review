@@ -51,9 +51,7 @@ You must respond with ONLY a single JSON object (no prose before or after, no ma
 Scoring guidance (relative to the ${quartile} bar): 1-3 = below bar / reject, 4-5 = major revision, 6-7 = minor revision, 8-10 = accept. Be honest — most real submissions land in the 4-7 range.`;
 }
 
-// ── FIX 5: Truncate manuscript to 8000 chars per reviewer call ───────────────
-// Full 60k text not needed — first 8k has title, abstract, intro, methods
-// This significantly reduces token count and generation time
+// ── FIX 5 (previous): Truncate manuscript to 8000 chars per reviewer call ────
 export function buildReviewerUser(paperText: string): string {
   const truncated = paperText.slice(0, 8000);
   const note =
@@ -66,7 +64,6 @@ export function buildReviewerUser(paperText: string): string {
 ${truncated}${note}
 === MANUSCRIPT END ===`;
 }
-// ────────────────────────────────────────────────────────────────────────────
 
 export function buildEditorSystem(quartile: Quartile): string {
   // "detailed thinking off" keeps reasoning-tuned models (e.g. Nemotron) from
@@ -96,6 +93,8 @@ Respond with ONLY a single JSON object (no prose, no fences):
 }`;
 }
 
+// ── FIX 3: Reduced editor input from ~3000 tokens → ~800 tokens ─────────────
+// Only major comments, truncated summaries, top 2 strengths/weaknesses
 export function buildEditorUser(
   reviews: { reviewer: ReviewerConfig; review: ReviewResult }[]
 ): string {
@@ -103,16 +102,17 @@ export function buildEditorUser(
     .map(
       ({ reviewer, review }) => `--- ${reviewer.name} (${reviewer.role}) ---
 Recommendation: ${review.recommendation} | Score: ${review.score}/10 | Confidence: ${review.confidence}/5
-Summary: ${review.summary}
-Strengths: ${review.strengths.join("; ") || "none noted"}
-Weaknesses: ${review.weaknesses.join("; ") || "none noted"}
+Summary: ${review.summary.slice(0, 300)}
+Strengths: ${review.strengths.slice(0, 2).join("; ") || "none noted"}
+Weaknesses: ${review.weaknesses.slice(0, 2).join("; ") || "none noted"}
 Key comments: ${review.comments
-        .map((c) => `[${c.severity}] (${c.section}) ${c.comment}`)
+        .filter((c) => c.severity === "major")
+        .slice(0, 2)
+        .map((c) => `[${c.severity}] (${c.section}) ${c.comment.slice(0, 150)}`)
         .join(" | ")}`
     )
     .join("\n\n");
 
-  return `Here are the four reviews. Synthesise them into your editorial decision as the specified JSON object.
-
-${blocks}`;
+  return `Here are the four reviews. Synthesise them into your editorial decision as the specified JSON object.\n\n${blocks}`;
 }
+// ────────────────────────────────────────────────────────────────────────────
