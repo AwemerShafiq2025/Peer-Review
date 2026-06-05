@@ -46,7 +46,7 @@ function buildPDF(report: ExportReport) {
   const pageW = 210;
   const pageH = 297;
   const margin = 18;
-  const contentW = pageW - margin * 2;
+  const contentW = pageW - margin * 2 - 6; // extra 6mm safe buffer so long lines never clip
   let y = 0;
 
   function checkNewPage(needed: number) {
