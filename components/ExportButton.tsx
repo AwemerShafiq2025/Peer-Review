@@ -46,7 +46,7 @@ function buildPDF(report: ExportReport) {
   const pageW = 210;
   const pageH = 297;
   const margin = 18;
-  const contentW = pageW - margin * 2 - 6; // extra 6mm safe buffer so long lines never clip
+  const contentW = pageW - margin * 2 - 6;
   let y = 0;
 
   function checkNewPage(needed: number) {
@@ -87,7 +87,6 @@ function buildPDF(report: ExportReport) {
   pdf.setFillColor(10, 10, 20);
   pdf.rect(0, 0, pageW, 30, "F");
 
-  // Accent line
   pdf.setFillColor(77, 155, 255);
   pdf.rect(0, 30, pageW, 1.2, "F");
 
@@ -99,9 +98,8 @@ function buildPDF(report: ExportReport) {
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8);
   pdf.setTextColor(160, 160, 180);
-  pdf.text("AI-Powered Peer Review Panel  ·  Albatross Technologies", margin, 20);
+  pdf.text("AI-Powered Peer Review Panel  .  Albatross Technologies", margin, 20);
 
-  // Date top right
   pdf.setFontSize(8);
   pdf.setTextColor(120, 120, 140);
   pdf.text(formatDate(report.date), pageW - margin, 20, { align: "right" });
@@ -120,22 +118,19 @@ function buildPDF(report: ExportReport) {
   y += 3;
 
   // ── META CHIPS ───────────────────────────────────────────────
-  // Quartile chip
   pdf.setFillColor(77, 155, 255);
   pdf.roundedRect(margin, y, 18, 7, 1.5, 1.5, "F");
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(8);
   pdf.setTextColor(255, 255, 255);
-  pdf.text(report.quartile ?? "—", margin + 9, y + 4.8, { align: "center" });
+  pdf.text(report.quartile ?? "-", margin + 9, y + 4.8, { align: "center" });
 
-  // Verdict chip
   const vColor = getVerdictColor(report.verdict.decision);
   pdf.setFillColor(...vColor);
   pdf.roundedRect(margin + 22, y, 38, 7, 1.5, 1.5, "F");
   pdf.setTextColor(255, 255, 255);
   pdf.text(report.verdict.decision, margin + 41, y + 4.8, { align: "center" });
 
-  // Score chip
   pdf.setFillColor(35, 35, 55);
   pdf.roundedRect(margin + 64, y, 28, 7, 1.5, 1.5, "F");
   pdf.setTextColor(180, 180, 200);
@@ -145,7 +140,7 @@ function buildPDF(report: ExportReport) {
           report.reviews.reduce((a, r) => a + (r.review?.score ?? 0), 0) /
           report.reviews.length
         ).toFixed(1)
-      : "—";
+      : "-";
   pdf.text(`Avg ${avgScore}/10`, margin + 78, y + 4.8, { align: "center" });
 
   y += 14;
@@ -165,7 +160,6 @@ function buildPDF(report: ExportReport) {
     y += 3;
   }
 
-  // 2-column: rationale + quartile assessment
   const colW = contentW / 2 - 3;
   if (report.verdict.decisionRationale || report.verdict.quartileAssessment) {
     pdf.setFont("helvetica", "bold");
@@ -190,7 +184,6 @@ function buildPDF(report: ExportReport) {
     y += 4;
   }
 
-  // Priority Actions
   if (report.verdict.priorityActions?.length) {
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(7.5);
@@ -199,14 +192,12 @@ function buildPDF(report: ExportReport) {
     y += 5;
     report.verdict.priorityActions.forEach((action, i) => {
       checkNewPage(10);
-      // Number circle
       pdf.setFillColor(77, 155, 255);
       pdf.circle(margin + 2.5, y - 1, 2.5, "F");
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(7);
       pdf.setTextColor(255, 255, 255);
       pdf.text(String(i + 1), margin + 2.5, y + 0.5, { align: "center" });
-      // Action text
       const aLines = pdf.splitTextToSize(action, contentW - 10);
       aLines.forEach((line: string, li: number) => {
         checkNewPage(5.5);
@@ -231,7 +222,6 @@ function buildPDF(report: ExportReport) {
   pdf.text("Reviewer Recommendations", margin, y);
   y += 8;
 
-  // Table header
   pdf.setFillColor(10, 10, 20);
   pdf.rect(margin, y, contentW, 8, "F");
   pdf.setFont("helvetica", "bold");
@@ -269,7 +259,7 @@ function buildPDF(report: ExportReport) {
       pdf.setTextColor(20, 20, 45);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8.5);
-      pdf.text(review.recommendation ?? "—", margin + 92, y + 4.5);
+      pdf.text(review.recommendation ?? "-", margin + 92, y + 4.5);
 
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(9);
@@ -277,9 +267,9 @@ function buildPDF(report: ExportReport) {
       pdf.text(`${review.confidence}/5`, margin + 157, y + 4.5);
     } else {
       pdf.setTextColor(140, 140, 160);
-      pdf.text("—", margin + 92, y + 4.5);
-      pdf.text("—", margin + 138, y + 4.5);
-      pdf.text("—", margin + 157, y + 4.5);
+      pdf.text("-", margin + 92, y + 4.5);
+      pdf.text("-", margin + 138, y + 4.5);
+      pdf.text("-", margin + 157, y + 4.5);
     }
     y += 9;
   });
@@ -294,7 +284,6 @@ function buildPDF(report: ExportReport) {
 
     checkNewPage(30);
 
-    // Reviewer header
     pdf.setFillColor(245, 248, 255);
     pdf.rect(margin, y, contentW, 11, "F");
     pdf.setFillColor(77, 155, 255);
@@ -304,7 +293,7 @@ function buildPDF(report: ExportReport) {
     pdf.setFontSize(10.5);
     pdf.setTextColor(15, 15, 30);
     pdf.text(
-      `${reviewer.name ?? `Reviewer ${idx + 1}`}  ·  ${reviewer.role ?? ""}`,
+      `${reviewer.name ?? `Reviewer ${idx + 1}`}  .  ${reviewer.role ?? ""}`,
       margin + 6,
       y + 7.5
     );
@@ -314,7 +303,7 @@ function buildPDF(report: ExportReport) {
     pdf.setFontSize(8.5);
     pdf.setTextColor(...recCol);
     pdf.text(
-      `${review.recommendation}  ·  ${review.score}/10`,
+      `${review.recommendation}  .  ${review.score}/10`,
       pageW - margin,
       y + 7.5,
       { align: "right" }
@@ -337,7 +326,7 @@ function buildPDF(report: ExportReport) {
       y += 5;
     }
 
-    // Strengths
+    // ── STRENGTHS (fixed: bullet aur text alag alag) ──────────
     if (review.strengths?.length) {
       checkNewPage(12);
       pdf.setFont("helvetica", "bold");
@@ -346,20 +335,24 @@ function buildPDF(report: ExportReport) {
       pdf.text("STRENGTHS", margin, y);
       y += 5;
       review.strengths.forEach((s) => {
-        const lines = pdf.splitTextToSize(`+  ${s}`, contentW - 6);
-        lines.forEach((line: string) => {
+        const bulletX = margin + 3;
+        const textX = margin + 8;
+        const textW = contentW - 11;
+        const lines = pdf.splitTextToSize(s, textW);
+        lines.forEach((line: string, li: number) => {
           checkNewPage(5.5);
           pdf.setFont("helvetica", "normal");
           pdf.setFontSize(9);
           pdf.setTextColor(35, 35, 60);
-          pdf.text(line, margin + 3, y);
+          if (li === 0) pdf.text("+", bulletX, y);
+          pdf.text(line, textX, y);
           y += 5.5;
         });
       });
       y += 3;
     }
 
-    // Weaknesses
+    // ── WEAKNESSES (fixed: bullet aur text alag alag) ─────────
     if (review.weaknesses?.length) {
       checkNewPage(12);
       pdf.setFont("helvetica", "bold");
@@ -368,13 +361,17 @@ function buildPDF(report: ExportReport) {
       pdf.text("WEAKNESSES", margin, y);
       y += 5;
       review.weaknesses.forEach((w) => {
-        const lines = pdf.splitTextToSize(`−  ${w}`, contentW - 6);
-        lines.forEach((line: string) => {
+        const bulletX = margin + 3;
+        const textX = margin + 8;
+        const textW = contentW - 11;
+        const lines = pdf.splitTextToSize(w, textW);
+        lines.forEach((line: string, li: number) => {
           checkNewPage(5.5);
           pdf.setFont("helvetica", "normal");
           pdf.setFontSize(9);
           pdf.setTextColor(35, 35, 60);
-          pdf.text(line, margin + 3, y);
+          if (li === 0) pdf.text("-", bulletX, y);
+          pdf.text(line, textX, y);
           y += 5.5;
         });
       });
@@ -448,7 +445,7 @@ function buildPDF(report: ExportReport) {
     pdf.setFontSize(6.5);
     pdf.setTextColor(110, 110, 135);
     pdf.text(
-      "PeerReviewer — AI-generated for guidance only. Not a substitute for formal peer review.",
+      "PeerReviewer - AI-generated for guidance only. Not a substitute for formal peer review.",
       margin,
       pageH - 4
     );
