@@ -463,10 +463,12 @@ export async function POST(req: NextRequest) {
         // Layer 3: deterministic majority-vote verdict (always works)
         const FALLBACK_EDITOR_MODEL = "mistralai/mixtral-8x7b-instruct-v0.1";
         send({ type: "editor_start" });
-        let verdict: EditorVerdict;
+        // Initialize with deterministic fallback — TypeScript guarantee that verdict is always assigned
+        let verdict: EditorVerdict = fallbackVerdict(completed, quartile);
+        let editorDone = false;
 
         // Layer 1 — primary editor
-        let editorDone = false;
+
         try {
           const text = await complete({
             model: EDITOR.model,
