@@ -51,13 +51,22 @@ You must respond with ONLY a single JSON object (no prose before or after, no ma
 Scoring guidance (relative to the ${quartile} bar): 1-3 = below bar / reject, 4-5 = major revision, 6-7 = minor revision, 8-10 = accept. Be honest — most real submissions land in the 4-7 range.`;
 }
 
+// ── FIX 5: Truncate manuscript to 8000 chars per reviewer call ───────────────
+// Full 60k text not needed — first 8k has title, abstract, intro, methods
+// This significantly reduces token count and generation time
 export function buildReviewerUser(paperText: string): string {
+  const truncated = paperText.slice(0, 8000);
+  const note =
+    paperText.length > 8000
+      ? "\n\n[Note: manuscript truncated to first 8,000 characters for review]"
+      : "";
   return `Here is the manuscript to review. Provide your review as the specified JSON object.
 
 === MANUSCRIPT START ===
-${paperText}
+${truncated}${note}
 === MANUSCRIPT END ===`;
 }
+// ────────────────────────────────────────────────────────────────────────────
 
 export function buildEditorSystem(quartile: Quartile): string {
   // "detailed thinking off" keeps reasoning-tuned models (e.g. Nemotron) from

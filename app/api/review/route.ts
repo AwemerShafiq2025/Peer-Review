@@ -1,3 +1,4 @@
+import pLimit from "p-limit";
 import { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { sql } from "@/lib/db";
@@ -206,15 +207,15 @@ function fallbackReview(reviewer: ReviewerConfig, quartile: Quartile): ReviewRes
   };
 }
 
-// ── FIX 2: Retry with exponential backoff ───────────────────────────────────
-// Bug: 1 attempt → timeout → immediate fallback
-// Fix: 2 attempts with 1s → 2s backoff
+// ── FIX 2: Smart retry with 429 detection + exponential backoff ──────────────
+// Bug: 2 attempts, generic 1s/2s wait, no 429 awareness
+// Fix: 3 attempts, 429 → 5s/10s wait, timeout → 2s/4s wait
 async function runReviewer(
   reviewer: ReviewerConfig,
   paperText: string,
   quartile: Quartile
 ): Promise<ReviewResult> {
-  const maxRetries = 2;
+  const maxRetries = 3;
   let lastError: any;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -223,14 +224,29 @@ async function runReviewer(
         system: buildReviewerSystem(reviewer, quartile),
         user: buildReviewerUser(paperText),
         temperature: 0.5,
-        maxTokens: 1300,
+        maxTokens: 900, // ── FIX 3: reduced from 1300 → 900 for faster generation
         timeoutMs: REVIEWER_TIMEOUT_MS,
       });
       return sanitizeReview(extractJson<any>(text));
     } catch (err: any) {
       lastError = err;
+      const is429 =
+        err?.status === 429 ||
+        err?.message?.includes("429") ||
+        err?.message?.includes("rate limit") ||
+        err?.message?.includes("Too Many Requests");
+      const isTimeout =
+        err?.message?.includes("timeout") || err?.message?.includes("aborted");
+
       if (attempt < maxRetries) {
-        await new Promise((res) => setTimeout(res, attempt * 1000));
+        // 429: wait longer (5s, 10s); timeout/other: shorter (2s, 4s)
+        const waitMs = is429 ? attempt * 5000 : attempt * 2000;
+        console.warn(
+          `Reviewer ${reviewer.id} attempt ${attempt} failed (${
+            is429 ? "429" : isTimeout ? "timeout" : "error"
+          }), retrying in ${waitMs}ms`
+        );
+        await new Promise((res) => setTimeout(res, waitMs));
       }
     }
   }
@@ -244,7 +260,6 @@ function extractPaperTitle(paperText: string) {
 
 function averageScore(completed: { review: ReviewResult }[]) {
   const avg = completed.reduce((sum, item) => sum + item.review.score, 0) / completed.length;
-
   return Math.round(avg * 10) / 10;
 }
 
@@ -387,30 +402,34 @@ export async function POST(req: NextRequest) {
           send({ type: "reviewer_start", reviewer: pub });
         }
 
-        // Run the reviewers concurrently, but stagger their launches by a few
-        // hundred ms so we don't hit the shared NVIDIA endpoint with a burst of
-        // simultaneous requests (a common trigger for 429 rate-limiting). Each
-        // streams its result the moment it finishes.
+        // ── FIX 1: p-limit concurrency control + FIX 4: 2000ms stagger ─────
+        // Max 2 concurrent LLM calls to avoid NVIDIA rate-limit burst
+        const limit = pLimit(2);
         const completed: { reviewer: ReviewerConfig; review: ReviewResult }[] = [];
+
         await Promise.all(
-          REVIEWERS.map(async (r, i) => {
-            if (i > 0) await new Promise((res) => setTimeout(res, i * 600));
-            try {
-              const review = await runReviewer(r, trimmed, quartile);
-              completed.push({ reviewer: r, review });
-              send({ type: "reviewer_done", reviewerId: r.id, review });
-            } catch (err: any) {
-              const review = fallbackReview(r, quartile);
-              completed.push({ reviewer: r, review });
-              send({
-                type: "reviewer_error",
-                reviewerId: r.id,
-                message: err?.message ? String(err.message) : "Reviewer failed to respond.",
-              });
-              send({ type: "reviewer_done", reviewerId: r.id, review });
-            }
-          })
+          REVIEWERS.map((r, i) =>
+            limit(async () => {
+              // ── FIX 4: increased stagger from 600ms → 2000ms ──────────────
+              if (i > 0) await new Promise((res) => setTimeout(res, i * 2000));
+              try {
+                const review = await runReviewer(r, trimmed, quartile);
+                completed.push({ reviewer: r, review });
+                send({ type: "reviewer_done", reviewerId: r.id, review });
+              } catch (err: any) {
+                const review = fallbackReview(r, quartile);
+                completed.push({ reviewer: r, review });
+                send({
+                  type: "reviewer_error",
+                  reviewerId: r.id,
+                  message: err?.message ? String(err.message) : "Reviewer failed to respond.",
+                });
+                send({ type: "reviewer_done", reviewerId: r.id, review });
+              }
+            })
+          )
         );
+        // ────────────────────────────────────────────────────────────────────
 
         if (completed.length === 0) {
           for (const reviewer of REVIEWERS) {
