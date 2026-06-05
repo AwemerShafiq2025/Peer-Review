@@ -7,6 +7,8 @@
 - NEXTAUTH_SECRET - random 32 char string
 - NEXTAUTH_URL - your production URL (https://yourapp.vercel.app)
 - INIT_DB_SECRET - random secret for DB init route
+- REVIEWER_TIMEOUT_MS=55000 - recommended reviewer timeout for better performance
+- EDITOR_TIMEOUT_MS=25000 - recommended editor timeout for better performance
 
 `NEXTAUTH_URL` must be set to your exact Vercel URL, for example
 `https://peer-review-livid.vercel.app`. Do not use `localhost:3000` in

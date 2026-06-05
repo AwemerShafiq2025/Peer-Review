@@ -29,8 +29,8 @@ export const maxDuration = 60;
 // once. 42s + 15s leaves headroom under the 60s function ceiling, and any
 // reviewer that blows its budget simply drops out — the editor decides on the
 // rest rather than the whole request hanging.
-const REVIEWER_TIMEOUT_MS = Number(process.env.REVIEWER_TIMEOUT_MS) || 40_000;
-const EDITOR_TIMEOUT_MS = Number(process.env.EDITOR_TIMEOUT_MS) || 18_000;
+const REVIEWER_TIMEOUT_MS = Number(process.env.REVIEWER_TIMEOUT_MS) || 55_000;
+const EDITOR_TIMEOUT_MS = Number(process.env.EDITOR_TIMEOUT_MS) || 25_000;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
 
@@ -250,6 +250,7 @@ async function saveReview({
   });
 
   try {
+    console.log("SAVING REVIEW, userId:", userId);
     await sql`
       INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result)
       VALUES (
@@ -360,11 +361,14 @@ export async function POST(req: NextRequest) {
               completed.push({ reviewer: r, review });
               send({ type: "reviewer_done", reviewerId: r.id, review });
             } catch (err: any) {
+              const review = fallbackReview(r, quartile);
+              completed.push({ reviewer: r, review });
               send({
                 type: "reviewer_error",
                 reviewerId: r.id,
                 message: err?.message ? String(err.message) : "Reviewer failed to respond.",
               });
+              send({ type: "reviewer_done", reviewerId: r.id, review });
             }
           })
         );

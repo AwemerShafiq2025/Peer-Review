@@ -15,8 +15,8 @@ export const REVIEWERS: ReviewerConfig[] = [
     role: "Methodology & Rigor",
     blurb:
       "Scrutinises study design, statistics, controls, sample sizes and whether the methods can actually answer the research question.",
-    model: "deepseek-ai/deepseek-v4-pro",
-    modelLabel: "DeepSeek V4 Pro",
+    model: "meta/llama-3.3-70b-instruct",
+    modelLabel: "Reviewer A",
     hue: "#4D9BFF",
   },
   {
@@ -25,8 +25,8 @@ export const REVIEWERS: ReviewerConfig[] = [
     role: "Novelty & Significance",
     blurb:
       "Weighs the contribution against the existing literature — is this new, important, and positioned correctly within the field?",
-    model: "nvidia/nemotron-3-super-120b-a12b",
-    modelLabel: "Nemotron 3 Super 120B",
+    model: "mistralai/mistral-large-2-instruct",
+    modelLabel: "Reviewer B",
     hue: "#00D4FF",
   },
   {
@@ -35,8 +35,8 @@ export const REVIEWERS: ReviewerConfig[] = [
     role: "Results & Validity",
     blurb:
       "Checks whether the claims are actually supported by the evidence, hunts for over-claiming, confounds and unaddressed limitations.",
-    model: "z-ai/glm-5.1",
-    modelLabel: "GLM 5.1",
+    model: "nvidia/llama-3.1-nemotron-70b-instruct",
+    modelLabel: "Reviewer C",
     hue: "#A78BFA",
   },
   {
@@ -45,8 +45,8 @@ export const REVIEWERS: ReviewerConfig[] = [
     role: "Clarity & Reproducibility",
     blurb:
       "Reads as a careful generalist — structure, writing, figures, and whether another lab could reproduce the work from what's written.",
-    model: "deepseek-ai/deepseek-v4-flash",
-    modelLabel: "DeepSeek V4 Flash",
+    model: "google/gemma-3-27b-it",
+    modelLabel: "Reviewer D",
     hue: "#FFD600",
   },
 ];
@@ -60,8 +60,8 @@ export const EDITOR = {
   id: "editor",
   name: "Handling Editor",
   role: "Editorial Decision",
-  model: "google/gemma-4-31b-it",
-  modelLabel: "Gemma 4 31B",
+  model: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+  modelLabel: "Editor",
   hue: "#34D399",
 };
 
