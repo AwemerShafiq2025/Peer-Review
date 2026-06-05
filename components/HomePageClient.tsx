@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
 import BackToTop from "@/components/BackToTop";
 import ExportButton from "@/components/ExportButton";
 import Footer from "@/components/Footer";
@@ -58,6 +58,42 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
       ? [{ reviewerId: reviewer.id, review: state.review }]
       : [];
   });
+
+  useEffect(() => {
+    if (!running) {
+      window.onbeforeunload = null;
+      return;
+    }
+
+    window.onbeforeunload = () => "A review is in progress. Leaving will cancel it.";
+
+    return () => {
+      window.onbeforeunload = null;
+    };
+  }, [running]);
+
+  useEffect(() => {
+    if (!running) return;
+
+    function confirmHistoryNavigation(event: globalThis.MouseEvent) {
+      const target = event.target;
+
+      if (!(target instanceof Element)) return;
+
+      const link = target.closest("a[href='/history']");
+      if (!link) return;
+
+      if (!window.confirm("A review is in progress. Are you sure you want to leave?")) {
+        event.preventDefault();
+      }
+    }
+
+    document.addEventListener("click", confirmHistoryNavigation, true);
+
+    return () => {
+      document.removeEventListener("click", confirmHistoryNavigation, true);
+    };
+  }, [running]);
 
   async function startReview(paperText: string, q: Quartile) {
     if (!isAuthenticated) {

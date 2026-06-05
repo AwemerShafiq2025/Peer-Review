@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import sql from "@/lib/db";
 import Navbar from "@/components/Navbar";
+import { IconDoc } from "@/components/icons";
 
 type ReviewRow = {
   id: string;
@@ -68,18 +69,17 @@ export default async function HistoryPage() {
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Your Review History</h1>
             <p className="mt-2 text-text-secondary">Past review runs saved to your account.</p>
           </div>
-          <Link href="/#submit" className="btn-primary !px-5 !py-2 text-sm">
-            Submit a paper
-          </Link>
         </div>
 
         {reviews.length === 0 ? (
           <div className="card flex min-h-64 flex-col items-center justify-center p-8 text-center">
+            <span className="grid h-12 w-12 place-items-center rounded-md bg-accent/15 text-accent ring-1 ring-accent/25">
+              <IconDoc width={22} height={22} />
+            </span>
             <h2 className="text-xl font-semibold">No reviews yet.</h2>
-            <p className="mt-2 text-text-secondary">No reviews yet. Submit your first paper!</p>
-            <Link href="/#submit" className="btn-primary mt-6">
-              Submit your first paper
-            </Link>
+            <p className="mt-2 text-text-secondary">
+              Your reviewed papers will appear here once you submit one.
+            </p>
           </div>
         ) : (
           <div className="card overflow-hidden">

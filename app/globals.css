@@ -38,6 +38,12 @@ body {
   background-attachment: fixed;
 }
 
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}
+
 ::selection {
   background: rgba(77, 155, 255, 0.35);
 }

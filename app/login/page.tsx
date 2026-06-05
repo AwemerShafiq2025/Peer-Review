@@ -33,7 +33,7 @@ function LoginForm() {
         return;
       }
 
-      router.push(result.url ?? "/");
+      router.push("/");
       router.refresh();
     } catch {
       setError("Invalid email or password");
@@ -43,7 +43,7 @@ function LoginForm() {
   }
 
   return (
-    <section className="card p-6 sm:p-8">
+    <section className="card p-4 sm:p-8">
       <div className="mb-6 text-center">
         <h1 className="text-2xl font-bold">Sign in</h1>
         <p className="mt-2 text-sm text-text-secondary">Continue to your peer review workspace.</p>
@@ -63,7 +63,7 @@ function LoginForm() {
             onChange={(event) => setEmail(event.target.value)}
             type="email"
             autoComplete="email"
-            className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
+            className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-base text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
             placeholder="you@example.com"
             required
           />
@@ -76,7 +76,7 @@ function LoginForm() {
             onChange={(event) => setPassword(event.target.value)}
             type="password"
             autoComplete="current-password"
-            className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
+            className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-base text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
             placeholder="Your password"
             required
           />
@@ -88,7 +88,7 @@ function LoginForm() {
           </p>
         )}
 
-        <button type="submit" disabled={loading} className="btn-primary w-full">
+        <button type="submit" disabled={loading} className="btn-primary min-h-[48px] w-full">
           {loading ? (
             <>
               <Spinner width={18} height={18} /> Signing in...
@@ -111,7 +111,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen bg-base px-6 py-12">
+    <main className="min-h-screen bg-base px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto flex min-h-[calc(100vh-6rem)] max-w-md flex-col justify-center">
         <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
           <span className="grid h-10 w-10 place-items-center rounded-md bg-accent/15 text-accent ring-1 ring-accent/30">

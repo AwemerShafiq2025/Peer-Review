@@ -8,6 +8,10 @@
 - NEXTAUTH_URL - your production URL (https://yourapp.vercel.app)
 - INIT_DB_SECRET - random secret for DB init route
 
+`NEXTAUTH_URL` must be set to your exact Vercel URL, for example
+`https://peer-review-livid.vercel.app`. Do not use `localhost:3000` in
+production, or auth redirects can point users back to a local development URL.
+
 ## After Deploy
 
 1. Visit: https://yourapp.vercel.app/api/init-db with header: x-init-secret: [your INIT_DB_SECRET] (use Postman or curl)

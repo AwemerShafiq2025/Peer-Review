@@ -48,7 +48,7 @@ function AuthLinks({
         <form
           action={async () => {
             "use server";
-            await signOut({ redirectTo: "/login" });
+            await signOut({ redirectTo: "/" });
           }}
         >
           <button type="submit" className={mobile ? "btn-outline w-full !px-4 !py-2 text-sm" : "btn-outline !px-4 !py-2 text-sm"}>

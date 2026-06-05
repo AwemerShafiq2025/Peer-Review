@@ -40,7 +40,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-base px-6 py-12">
+    <main className="min-h-screen bg-base px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto flex min-h-[calc(100vh-6rem)] max-w-md flex-col justify-center">
         <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
           <span className="grid h-10 w-10 place-items-center rounded-md bg-accent/15 text-accent ring-1 ring-accent/30">
@@ -51,7 +51,7 @@ export default function RegisterPage() {
           </span>
         </Link>
 
-        <section className="card p-6 sm:p-8">
+        <section className="card p-4 sm:p-8">
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-bold">Create your account</h1>
             <p className="mt-2 text-sm text-text-secondary">Save reviews and return to your paper history.</p>
@@ -64,7 +64,7 @@ export default function RegisterPage() {
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 autoComplete="name"
-                className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
+                className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-base text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
                 placeholder="Ada Lovelace"
                 required
               />
@@ -77,7 +77,7 @@ export default function RegisterPage() {
                 onChange={(event) => setEmail(event.target.value)}
                 type="email"
                 autoComplete="email"
-                className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
+                className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-base text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
                 placeholder="you@example.com"
                 required
               />
@@ -91,7 +91,7 @@ export default function RegisterPage() {
                 type="password"
                 autoComplete="new-password"
                 minLength={8}
-                className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
+                className="w-full rounded-md border border-subtle bg-base/60 px-4 py-3 text-base text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent/60"
                 placeholder="At least 8 characters"
                 required
               />
@@ -103,7 +103,7 @@ export default function RegisterPage() {
               </p>
             )}
 
-            <button type="submit" disabled={loading} className="btn-primary w-full">
+            <button type="submit" disabled={loading} className="btn-primary min-h-[48px] w-full">
               {loading ? (
                 <>
                   <Spinner width={18} height={18} /> Creating account...

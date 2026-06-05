@@ -293,6 +293,7 @@ function checkRateLimit(userId: string) {
 export async function POST(req: NextRequest) {
   const session = await auth();
   console.log("Review POST session:", session);
+  console.log("SESSION CHECK:", JSON.stringify(session?.user));
   const userId = (session?.user as { id?: string } | undefined)?.id;
 
   if (!session?.user || !userId) {
@@ -396,9 +397,11 @@ export async function POST(req: NextRequest) {
         }
 
         send({ type: "editor_done", verdict });
+        console.log("ATTEMPTING SAVE for user:", userId);
 
         try {
           await saveReview({ userId, paperText: trimmed, quartile, verdict, completed });
+          send({ type: "status", message: "Review saved to history." });
           send({ type: "review_saved" });
         } catch (err) {
           console.error("Failed to save review:", err);
