@@ -15,7 +15,6 @@
     "@types/jsonwebtoken": "^9.0.10",
     "bcryptjs": "^3.0.3",
     "eslint-config-next": "^14.2.35",
-    "html2canvas": "^1.4.1",
     "jose": "^6.2.3",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
