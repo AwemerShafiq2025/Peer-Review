@@ -234,7 +234,6 @@ async function saveReview({
     quartile,
     panel,
   };
-  const fullResultJson = JSON.stringify(fullResult);
   const insertValues = {
     userId,
     paperTitle,
@@ -246,7 +245,7 @@ async function saveReview({
 
   console.log("Saving review with SQL:", {
     sql:
-      "INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result) VALUES ($1, $2, $3, $4, $5, $6::jsonb)",
+      "INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result) VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb)",
     values: insertValues,
   });
 
@@ -254,19 +253,20 @@ async function saveReview({
     await sql`
       INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result)
       VALUES (
-        ${userId},
+        ${userId}::uuid,
         ${paperTitle},
         ${quartile},
         ${verdict.decision},
         ${avgScore},
-        ${fullResultJson}::jsonb
+        ${fullResult}::jsonb
       )
     `;
+    console.log("Review saved for user:", userId);
   } catch (err) {
     console.error("Review INSERT failed:", {
       error: err,
       sql:
-        "INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result) VALUES ($1, $2, $3, $4, $5, $6::jsonb)",
+        "INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result) VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb)",
       values: insertValues,
     });
     throw err;
