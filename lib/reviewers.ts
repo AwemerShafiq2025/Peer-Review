@@ -15,7 +15,7 @@ export const REVIEWERS: ReviewerConfig[] = [
     role: "Methodology & Rigor",
     blurb:
       "Scrutinises study design, statistics, controls, sample sizes and whether the methods can actually answer the research question.",
-    model: "meta/llama-4-maverick-17b-128e-instruct",
+    model: "meta/llama-3.3-70b-instruct",
     modelLabel: "Reviewer A",
     hue: "#4D9BFF",
   },
