@@ -34,9 +34,78 @@ const REC_STYLE: Record<Recommendation, string> = {
 
 function parseResult(value: ReviewRow["full_result"]): SavedResult | null {
   if (!value) return null;
-  if (typeof value === "string") return JSON.parse(value) as SavedResult;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as SavedResult;
+    } catch {
+      return null;
+    }
+  }
 
   return value;
+}
+
+function normalizeResult(value: SavedResult | null): SavedResult | null {
+  if (!value || !value.verdict || !Array.isArray(value.reviews) || !Array.isArray(value.panel)) {
+    return null;
+  }
+
+  return {
+    verdict: {
+      decision: value.verdict.decision,
+      metaReview: String(value.verdict.metaReview ?? ""),
+      decisionRationale: String(value.verdict.decisionRationale ?? ""),
+      quartileAssessment: String(value.verdict.quartileAssessment ?? ""),
+      priorityActions: Array.isArray(value.verdict.priorityActions) ? value.verdict.priorityActions : [],
+    },
+    reviews: value.reviews
+      .filter((item) => item?.reviewerId && item?.review)
+      .map((item) => ({
+        reviewerId: String(item.reviewerId),
+        review: {
+          summary: String(item.review.summary ?? ""),
+          strengths: Array.isArray(item.review.strengths) ? item.review.strengths : [],
+          weaknesses: Array.isArray(item.review.weaknesses) ? item.review.weaknesses : [],
+          comments: Array.isArray(item.review.comments) ? item.review.comments : [],
+          questionsForAuthors: Array.isArray(item.review.questionsForAuthors)
+            ? item.review.questionsForAuthors
+            : [],
+          recommendation: item.review.recommendation,
+          confidence: Number(item.review.confidence) || 0,
+          score: Number(item.review.score) || 0,
+        },
+      })),
+    quartile: value.quartile,
+    panel: value.panel.map((reviewer, index) => ({
+      id: String(reviewer?.id ?? value.reviews[index]?.reviewerId ?? `reviewer-${index + 1}`),
+      name: String(reviewer?.name ?? `Reviewer ${index + 1}`),
+      role: String(reviewer?.role ?? "Peer Review"),
+      blurb: String(reviewer?.blurb ?? ""),
+      hue: String(reviewer?.hue ?? "#4D9BFF"),
+    })),
+  };
+}
+
+function displayTitle(value: string | null) {
+  return (value || "Untitled Paper").replace(/^Title:\s*/i, "");
+}
+
+function DetailError() {
+  return (
+    <main className="min-h-screen bg-base px-6 py-12">
+      <section className="mx-auto max-w-3xl">
+        <Link href="/history" className="btn-outline !px-4 !py-2 text-sm">
+          Back to history
+        </Link>
+        <div className="card mt-6 p-8 text-center">
+          <h1 className="text-2xl font-bold">Could not load review details</h1>
+          <p className="mt-2 text-text-secondary">
+            Could not load review details. The data may be from an older format.
+          </p>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function formatDate(value: string | Date) {
@@ -85,25 +154,23 @@ export default async function ReviewDetailPage({ params }: { params: { id: strin
     );
   }
 
-  const result = parseResult(review.full_result);
+  let result: SavedResult;
+  try {
+    console.log("Raw saved review full_result:", review.full_result);
+    const parsed = normalizeResult(parseResult(review.full_result));
 
-  if (!result) {
-    return (
-      <main className="min-h-screen bg-base px-6 py-12">
-        <section className="mx-auto max-w-3xl">
-          <Link href="/history" className="btn-outline !px-4 !py-2 text-sm">
-            Back to history
-          </Link>
-          <div className="card mt-6 p-8 text-center">
-            <h1 className="text-2xl font-bold">Review not found</h1>
-            <p className="mt-2 text-text-secondary">The saved review data could not be loaded.</p>
-          </div>
-        </section>
-      </main>
-    );
+    if (!parsed) {
+      throw new Error("Malformed saved review result.");
+    }
+
+    result = parsed;
+  } catch (error) {
+    console.error("Could not load review details:", error);
+    return <DetailError />;
   }
 
   const reviewById = new Map(result.reviews.map((item) => [item.reviewerId, item.review]));
+  const paperTitle = displayTitle(review.paper_title);
 
   return (
     <main className="min-h-screen bg-base px-6 py-12">
@@ -116,7 +183,7 @@ export default async function ReviewDetailPage({ params }: { params: { id: strin
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                {review.paper_title || "Untitled Paper"}
+                {paperTitle}
               </h1>
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="chip !py-1 font-mono text-xs">{review.quartile || result.quartile}</span>
@@ -126,7 +193,7 @@ export default async function ReviewDetailPage({ params }: { params: { id: strin
             </div>
             <ExportButton
               report={{
-                paperTitle: review.paper_title || "Untitled Paper",
+                paperTitle,
                 date: review.created_at,
                 quartile: review.quartile || result.quartile,
                 verdict: result.verdict,
@@ -162,16 +229,16 @@ export default async function ReviewDetailPage({ params }: { params: { id: strin
                       <tr key={reviewer.id} className="border-b border-subtle/60 last:border-0">
                         <td className="p-4">
                           <div className="flex items-center gap-2.5">
-                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: reviewer.hue }} />
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: reviewer.hue ?? "#4D9BFF" }} />
                             <div>
-                              <div className="font-medium leading-tight">{reviewer.name}</div>
-                              <div className="text-xs text-text-tertiary">{reviewer.role}</div>
+                              <div className="font-medium leading-tight">{reviewer.name ?? "Reviewer"}</div>
+                              <div className="text-xs text-text-tertiary">{reviewer.role ?? "Peer Review"}</div>
                             </div>
                           </div>
                         </td>
                         <td className="p-4">
                           {savedReview ? (
-                            <span className={`inline-block rounded-pill px-2.5 py-0.5 text-xs font-semibold ring-1 ${REC_STYLE[savedReview.recommendation]}`}>
+                            <span className={`inline-block rounded-pill px-2.5 py-0.5 text-xs font-semibold ring-1 ${REC_STYLE[savedReview.recommendation] ?? "bg-white/5 text-text-secondary ring-white/10"}`}>
                               {savedReview.recommendation}
                             </span>
                           ) : (

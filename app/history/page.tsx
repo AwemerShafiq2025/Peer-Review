@@ -45,6 +45,10 @@ function formatScore(value: string | number | null) {
   return Number.isFinite(score) ? `${score.toFixed(1).replace(/\.0$/, "")}/10` : "N/A";
 }
 
+function displayTitle(value: string | null) {
+  return (value || "Untitled Paper").replace(/^Title:\s*/i, "");
+}
+
 export default async function HistoryPage() {
   const session = await auth();
   const userId = (session?.user as { id?: string } | undefined)?.id;
@@ -99,7 +103,7 @@ export default async function HistoryPage() {
                   className="grid gap-4 px-5 py-5 md:grid-cols-[1.7fr_0.5fr_0.9fr_0.55fr_0.8fr_0.7fr] md:items-center"
                 >
                   <div>
-                    <p className="font-semibold">{review.paper_title || "Untitled Paper"}</p>
+                    <p className="font-semibold">{displayTitle(review.paper_title)}</p>
                     <p className="mt-1 text-xs text-text-tertiary md:hidden">
                       {formatDate(review.created_at)}
                     </p>
