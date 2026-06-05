@@ -1,4 +1,3 @@
-import pLimit from "p-limit";
 import { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { sql } from "@/lib/db";
@@ -21,10 +20,10 @@ import type {
 } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Increased from 60 → 300 for sequential reviewer execution
+export const maxDuration = 300;
 
-const REVIEWER_TIMEOUT_MS = Number(process.env.REVIEWER_TIMEOUT_MS) || 50_000;
-// ── FIX 1: Reduced from 20_000 → 15_000 so editor doesn't hang indefinitely
+const REVIEWER_TIMEOUT_MS = Number(process.env.REVIEWER_TIMEOUT_MS) || 55_000;
 const EDITOR_TIMEOUT_MS = Number(process.env.EDITOR_TIMEOUT_MS) || 15_000;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const RATE_LIMIT_MAX = 5;
@@ -32,8 +31,6 @@ const RATE_LIMIT_MAX = 5;
 const QUARTILES: Quartile[] = ["Q1", "Q2", "Q3", "Q4"];
 const MAX_CHARS = 60_000;
 
-const RECS: Recommendation[] = ["Accept", "Minor Revision", "Major Revision", "Reject"];
-const DECISIONS: FinalDecision[] = ["Accepted", "Minor Revision", "Major Revision", "Rejected"];
 const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function clampNum(n: unknown, min: number, max: number, fallback: number): number {
@@ -99,6 +96,7 @@ function sanitizeVerdict(raw: any): EditorVerdict {
   };
 }
 
+// Majority-vote aggregation — avg alone was giving wrong results
 function fallbackVerdict(
   completed: { reviewer: ReviewerConfig; review: ReviewResult }[],
   quartile: Quartile
@@ -117,32 +115,43 @@ function fallbackVerdict(
 
   let decision: FinalDecision;
 
+  // Majority vote (>50%) wins outright
   if (counts["Reject"] > total / 2) decision = "Rejected";
   else if (counts["Major Revision"] > total / 2) decision = "Major Revision";
   else if (counts["Accept"] > total / 2) decision = "Accepted";
   else {
+    // No majority — weighted average as tiebreaker
     if (avg >= 7.5) decision = "Accepted";
     else if (avg >= 6) decision = "Minor Revision";
     else if (avg >= 4) decision = "Major Revision";
     else decision = "Rejected";
   }
 
+  // Hard override: enforce stricter decision if majority agrees
   if (counts["Reject"] >= Math.ceil(total / 2)) decision = "Rejected";
-  else if (counts["Major Revision"] >= Math.ceil(total / 2) && decision === "Minor Revision")
+  else if (
+    counts["Major Revision"] >= Math.ceil(total / 2) &&
+    decision === "Minor Revision"
+  )
     decision = "Major Revision";
 
   const recSummary = completed
     .map((c) => `${c.reviewer.name}: ${c.review.recommendation} (${c.review.score}/10)`)
     .join("; ");
 
-  const majorComments = completed
-    .flatMap((c) => c.review.comments.filter((cm) => cm.severity === "major").map((cm) => cm.comment));
+  const majorComments = completed.flatMap((c) =>
+    c.review.comments.filter((cm) => cm.severity === "major").map((cm) => cm.comment)
+  );
   const weaknesses = completed.flatMap((c) => c.review.weaknesses);
   const priorityActions = Array.from(new Set([...majorComments, ...weaknesses])).slice(0, 4);
 
   return {
     decision,
-    metaReview: `Based on ${completed.length} completed review${completed.length === 1 ? "" : "s"}, the panel's aggregate assessment for this ${quartile} venue is "${decision}" (average score ${avg.toFixed(1)}/10). This summary was compiled directly from the reviewers' scores and recommendations because the editorial synthesis model was unavailable; the individual reviews above carry the detailed reasoning.`,
+    metaReview: `Based on ${completed.length} completed review${
+      completed.length === 1 ? "" : "s"
+    }, the panel's aggregate assessment for this ${quartile} venue is "${decision}" (average score ${avg.toFixed(
+      1
+    )}/10). This summary was compiled directly from the reviewers' scores and recommendations because the editorial synthesis model was unavailable; the individual reviews above carry the detailed reasoning.`,
     decisionRationale: `Reviewer recommendations — ${recSummary}.`,
     quartileAssessment: `Scores are calibrated to the ${quartile} bar, and the decision threshold reflects that target.`,
     priorityActions,
@@ -184,6 +193,7 @@ function fallbackReview(reviewer: ReviewerConfig, quartile: Quartile): ReviewRes
   };
 }
 
+// Retry with exponential backoff + 429 detection
 async function runReviewer(
   reviewer: ReviewerConfig,
   paperText: string,
@@ -213,6 +223,7 @@ async function runReviewer(
         err?.message?.includes("timeout") || err?.message?.includes("aborted");
 
       if (attempt < maxRetries) {
+        // 429: wait longer (5s, 10s) — timeout: shorter (2s, 4s)
         const waitMs = is429 ? attempt * 5000 : attempt * 2000;
         console.warn(
           `Reviewer ${reviewer.id} attempt ${attempt} failed (${
@@ -226,8 +237,7 @@ async function runReviewer(
   throw lastError;
 }
 
-// ── FIX 2: Hard timeout wrapper using Promise.race() ────────────────────────
-// Ensures editor ALWAYS resolves within ms — no indefinite hanging
+// Hard deadline wrapper — prevents hanging promises
 function withHardTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
@@ -236,14 +246,14 @@ function withHardTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     ),
   ]);
 }
-// ────────────────────────────────────────────────────────────────────────────
 
 function extractPaperTitle(paperText: string) {
   return paperText.split(/\r?\n/)[0]?.trim().slice(0, 120) || "Untitled Paper";
 }
 
 function averageScore(completed: { review: ReviewResult }[]) {
-  const avg = completed.reduce((sum, item) => sum + item.review.score, 0) / completed.length;
+  const avg =
+    completed.reduce((sum, item) => sum + item.review.score, 0) / completed.length;
   return Math.round(avg * 10) / 10;
 }
 
@@ -272,20 +282,6 @@ async function saveReview({
     quartile,
     panel,
   };
-  const insertValues = {
-    userId,
-    paperTitle,
-    quartile,
-    verdict: verdict.decision,
-    avgScore,
-    fullResult,
-  };
-
-  console.log("Saving review with SQL:", {
-    sql:
-      "INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result) VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb)",
-    values: insertValues,
-  });
 
   try {
     console.log("SAVING REVIEW, userId:", userId);
@@ -300,14 +296,9 @@ async function saveReview({
         ${fullResult}::jsonb
       )
     `;
-    console.log("Review saved for user:", userId);
+    console.log("✅ Review saved for user:", userId);
   } catch (err) {
-    console.error("Review INSERT failed:", {
-      error: err,
-      sql:
-        "INSERT INTO reviews (user_id, paper_title, quartile, verdict, avg_score, full_result) VALUES ($1::uuid, $2, $3, $4, $5, $6::jsonb)",
-      values: insertValues,
-    });
+    console.error("❌ Review INSERT failed:", err);
     throw err;
   }
 }
@@ -320,28 +311,27 @@ function checkRateLimit(userId: string) {
     rateLimitBuckets.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return true;
   }
-
-  if (current.count >= RATE_LIMIT_MAX) {
-    return false;
-  }
-
+  if (current.count >= RATE_LIMIT_MAX) return false;
   current.count += 1;
   return true;
 }
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  console.log("Review POST session:", session);
-  console.log("SESSION CHECK:", JSON.stringify(session?.user));
   const userId = (session?.user as { id?: string } | undefined)?.id;
 
   if (!session?.user || !userId) {
-    return new Response(JSON.stringify({ error: "Please sign in to submit a review." }), { status: 401 });
+    return new Response(
+      JSON.stringify({ error: "Please sign in to submit a review." }),
+      { status: 401 }
+    );
   }
 
   if (!checkRateLimit(userId)) {
     return new Response(
-      JSON.stringify({ error: "Too many requests. Please wait before submitting another review." }),
+      JSON.stringify({
+        error: "Too many requests. Please wait before submitting another review.",
+      }),
       { status: 429 }
     );
   }
@@ -358,16 +348,23 @@ export async function POST(req: NextRequest) {
 
   if (paperText.length < 300) {
     return new Response(
-      JSON.stringify({ error: "The manuscript text is too short to review (need at least ~300 characters)." }),
+      JSON.stringify({
+        error: "The manuscript text is too short to review (need at least ~300 characters).",
+      }),
       { status: 400 }
     );
   }
   if (!QUARTILES.includes(quartile)) {
-    return new Response(JSON.stringify({ error: "Invalid quartile. Use Q1–Q4." }), { status: 400 });
+    return new Response(
+      JSON.stringify({ error: "Invalid quartile. Use Q1–Q4." }),
+      { status: 400 }
+    );
   }
   if (!process.env.NVIDIA_API_KEY) {
     return new Response(
-      JSON.stringify({ error: "Server is missing NVIDIA_API_KEY. Set it in the environment." }),
+      JSON.stringify({
+        error: "Server is missing NVIDIA_API_KEY. Set it in the environment.",
+      }),
       { status: 500 }
     );
   }
@@ -386,30 +383,29 @@ export async function POST(req: NextRequest) {
           send({ type: "reviewer_start", reviewer: pub });
         }
 
-        const limit = pLimit(2);
+        // Sequential execution — one reviewer at a time with 3s gap
+        // Avoids NVIDIA rate-limit burst from parallel calls
         const completed: { reviewer: ReviewerConfig; review: ReviewResult }[] = [];
 
-        await Promise.all(
-          REVIEWERS.map((r, i) =>
-            limit(async () => {
-              if (i > 0) await new Promise((res) => setTimeout(res, i * 2000));
-              try {
-                const review = await runReviewer(r, trimmed, quartile);
-                completed.push({ reviewer: r, review });
-                send({ type: "reviewer_done", reviewerId: r.id, review });
-              } catch (err: any) {
-                const review = fallbackReview(r, quartile);
-                completed.push({ reviewer: r, review });
-                send({
-                  type: "reviewer_error",
-                  reviewerId: r.id,
-                  message: err?.message ? String(err.message) : "Reviewer failed to respond.",
-                });
-                send({ type: "reviewer_done", reviewerId: r.id, review });
-              }
-            })
-          )
-        );
+        for (const r of REVIEWERS) {
+          try {
+            send({ type: "status", message: `${r.name} is reviewing…` });
+            const review = await runReviewer(r, trimmed, quartile);
+            completed.push({ reviewer: r, review });
+            send({ type: "reviewer_done", reviewerId: r.id, review });
+          } catch (err: any) {
+            const review = fallbackReview(r, quartile);
+            completed.push({ reviewer: r, review });
+            send({
+              type: "reviewer_error",
+              reviewerId: r.id,
+              message: String(err?.message ?? "timeout"),
+            });
+            send({ type: "reviewer_done", reviewerId: r.id, review });
+          }
+          // 3s gap between reviewers to avoid rate limiting
+          await new Promise((res) => setTimeout(res, 3000));
+        }
 
         if (completed.length === 0) {
           for (const reviewer of REVIEWERS) {
@@ -419,22 +415,20 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // ── FIX 2: Editor with Promise.race() hard timeout ───────────────────
-        // Layer 1: primary editor — hard 12s ceiling
-        // Layer 2: fast fallback model — hard 10s ceiling
-        // Layer 3: deterministic fallback — instant, always works
+        // 3-layer editor fallback with hard timeouts
         const EDITOR_FALLBACK_MODEL = "meta/llama-3.3-70b-instruct";
         send({ type: "editor_start" });
         let verdict: EditorVerdict;
 
         try {
+          // Layer 1: primary editor — 12s hard timeout
           verdict = await withHardTimeout(
             complete({
               model: EDITOR.model,
               system: buildEditorSystem(quartile),
               user: buildEditorUser(completed),
               temperature: 0.4,
-              maxTokens: 600, // reduced from 800
+              maxTokens: 600,
               timeoutMs: 12_000,
             }).then((text) => sanitizeVerdict(extractJson<any>(text))),
             12_000
@@ -442,6 +436,7 @@ export async function POST(req: NextRequest) {
         } catch (primaryErr) {
           console.warn("Primary editor failed:", primaryErr);
           try {
+            // Layer 2: lighter fallback model — 10s hard timeout
             verdict = await withHardTimeout(
               complete({
                 model: EDITOR_FALLBACK_MODEL,
@@ -454,14 +449,13 @@ export async function POST(req: NextRequest) {
               10_000
             );
           } catch {
+            // Layer 3: deterministic majority-vote — always instant
             console.warn("Both editor models failed — using deterministic fallback");
             verdict = fallbackVerdict(completed, quartile);
           }
         }
-        // ────────────────────────────────────────────────────────────────────
 
         send({ type: "editor_done", verdict });
-        console.log("ATTEMPTING SAVE for user:", userId);
 
         try {
           await saveReview({ userId, paperText: trimmed, quartile, verdict, completed });
@@ -471,11 +465,15 @@ export async function POST(req: NextRequest) {
           console.error("Failed to save review:", err);
           send({
             type: "error",
-            message: "The review completed, but it could not be saved to your history. Please try again.",
+            message:
+              "The review completed, but it could not be saved to your history. Please try again.",
           });
         }
       } catch (err: any) {
-        send({ type: "error", message: err?.message ? String(err.message) : "Unexpected server error." });
+        send({
+          type: "error",
+          message: err?.message ? String(err.message) : "Unexpected server error.",
+        });
       } finally {
         controller.close();
       }
