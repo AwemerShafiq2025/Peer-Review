@@ -51,12 +51,19 @@ export default function Footer() {
             >
               NVIDIA NIM
             </a>
-            <a href="#" className="transition-colors hover:text-text-primary">
+            {/* ── GitHub link updated ── */}
+            <a
+              href="https://github.com/AwemerShafiq2025/Peer-Review"
+              target="_blank"
+              rel="noreferrer"
+              className="transition-colors hover:text-text-primary"
+            >
               GitHub
             </a>
-            <a href="#" className="transition-colors hover:text-text-primary">
-              Disclaimer
-            </a>
+            {/* ── Disclaimer → About page ── */}
+            <Link href="/about" className="transition-colors hover:text-text-primary">
+              About & Disclaimer
+            </Link>
           </nav>
         </div>
       </div>

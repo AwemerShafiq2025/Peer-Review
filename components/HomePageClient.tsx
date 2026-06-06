@@ -8,6 +8,8 @@ import UploadForm from "@/components/UploadForm";
 import ReviewerCard, { type CardStatus } from "@/components/ReviewerCard";
 import ConsolidatedPanel from "@/components/ConsolidatedPanel";
 import ReviewProgress from "@/components/ReviewProgress";
+import StatsSection from "@/components/StatsSection";
+import SampleReviewDemo from "@/components/SampleReviewDemo";
 import { ToastViewport, useToast } from "@/components/Toast";
 import { IconArrow, IconDoc, IconGavel, IconSpark, IconUser } from "@/components/icons";
 import { publicReviewers, EDITOR } from "@/lib/reviewers";
@@ -220,6 +222,9 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
         </div>
       </section>
 
+      {/* Stats Section — after Hero */}
+      <StatsSection />
+
       {/* How it works */}
       <section id="how" className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-4 sm:grid-cols-3">
@@ -290,6 +295,9 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
           </div>
         </div>
       </section>
+
+      {/* Sample Demo — guests only */}
+      {!isAuthenticated && <SampleReviewDemo />}
 
       {/* Submit */}
       <section id="submit" className="mx-auto max-w-3xl px-6 py-12">
