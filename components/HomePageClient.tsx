@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import UploadForm from "@/components/UploadForm";
 import ReviewerCard, { type CardStatus } from "@/components/ReviewerCard";
 import ConsolidatedPanel from "@/components/ConsolidatedPanel";
+import ReviewProgress from "@/components/ReviewProgress";
 import { ToastViewport, useToast } from "@/components/Toast";
 import { IconArrow, IconDoc, IconGavel, IconSpark, IconUser } from "@/components/icons";
 import { publicReviewers, EDITOR } from "@/lib/reviewers";
@@ -320,24 +321,13 @@ export default function HomePageClient({ isAuthenticated }: { isAuthenticated: b
       <section ref={resultsRef} className="mx-auto max-w-6xl scroll-mt-20 px-6">
         {started && (
           <div className="space-y-6">
-            {statusMsg && (
-              <p className="text-center text-sm text-text-secondary">{statusMsg}</p>
-            )}
-
-            {showReviewProgress && (
-              <div className="mx-auto max-w-xl">
-                <div className="mb-2 flex items-center justify-between text-xs text-text-secondary">
-                  <span>{progressLabel}</span>
-                  <span className="font-mono">{completedReviewers}/{PANEL.length}</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-pill bg-white/10">
-                  <div
-                    className="h-full rounded-pill bg-accent transition-all duration-500"
-                    style={{ width: `${(completedReviewers / PANEL.length) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
+            <ReviewProgress
+              completedReviewers={completedReviewers}
+              totalReviewers={PANEL.length}
+              editorStatus={editorStatus}
+              statusMsg={statusMsg}
+              visible={showReviewProgress}
+            />
 
             {fatalError && (
               <div className="card border-rose-400/30 bg-rose-500/5 p-5 text-rose-300">

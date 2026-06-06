@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "Peer Reviewer — AI Review Panel",
   description:
     "Submit a scientific manuscript and get a realistic, multi-reviewer peer review with an editorial decision — powered by NVIDIA NIM. Built by Albatross Technologies.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

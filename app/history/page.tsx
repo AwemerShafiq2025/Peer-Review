@@ -1,9 +1,13 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import sql from "@/lib/db";
 import Navbar from "@/components/Navbar";
 import { IconDoc } from "@/components/icons";
+import DeleteReviewButton from "@/components/DeleteReviewButton";
+import EditTitleButton from "@/components/EditTitleButton";
+import HistorySearch from "@/components/HistorySearch";
 
 type ReviewRow = {
   id: string;
@@ -49,7 +53,11 @@ function displayTitle(value: string | null) {
   return (value || "Untitled Paper").replace(/^Title:\s*/i, "");
 }
 
-export default async function HistoryPage() {
+export default async function HistoryPage({
+  searchParams,
+}: {
+  searchParams?: { q?: string; verdict?: string };
+}) {
   const session = await auth();
   const userId = (session?.user as { id?: string } | undefined)?.id;
 
@@ -57,10 +65,21 @@ export default async function HistoryPage() {
     redirect("/login");
   }
 
+  const q = searchParams?.q?.trim() ?? "";
+  const verdictFilter = searchParams?.verdict ?? "";
+
   const reviews = (await sql.query(
     `SELECT id, paper_title, quartile, verdict, avg_score, created_at
-     FROM reviews WHERE user_id = $1 ORDER BY created_at DESC`,
-    [userId]
+     FROM reviews 
+     WHERE user_id = $1
+     ${q ? "AND LOWER(paper_title) LIKE LOWER($2)" : ""}
+     ${verdictFilter ? `AND verdict = $${q ? "3" : "2"}` : ""}
+     ORDER BY created_at DESC`,
+    [
+      userId,
+      ...(q ? [`%${q}%`] : []),
+      ...(verdictFilter ? [verdictFilter] : []),
+    ]
   )) as ReviewRow[];
 
   return (
@@ -74,6 +93,10 @@ export default async function HistoryPage() {
             <p className="mt-2 text-text-secondary">Past review runs saved to your account.</p>
           </div>
         </div>
+
+        <Suspense fallback={<div className="mb-8 h-12 rounded-md bg-elevated/50 animate-pulse" />}>
+          <HistorySearch />
+        </Suspense>
 
         {reviews.length === 0 ? (
           <div className="card flex min-h-64 flex-col items-center justify-center p-8 text-center">
@@ -100,9 +123,13 @@ export default async function HistoryPage() {
               {reviews.map((review) => (
                 <div
                   key={review.id}
-                  className="grid gap-4 px-5 py-5 md:grid-cols-[1.7fr_0.5fr_0.9fr_0.55fr_0.8fr_0.7fr] md:items-center"
+                  className="group grid gap-4 px-5 py-5 md:grid-cols-[1.7fr_0.5fr_0.9fr_0.55fr_0.8fr_0.7fr] md:items-center"
                 >
-                  <div>
+                  <div className="flex items-center gap-1">
+                    <EditTitleButton
+                      reviewId={review.id}
+                      currentTitle={displayTitle(review.paper_title)}
+                    />
                     <p className="font-semibold">{displayTitle(review.paper_title)}</p>
                     <p className="mt-1 text-xs text-text-tertiary md:hidden">
                       {formatDate(review.created_at)}
@@ -125,6 +152,7 @@ export default async function HistoryPage() {
                   <p className="hidden text-sm text-text-secondary md:block">{formatDate(review.created_at)}</p>
 
                   <div className="md:text-right">
+                    <DeleteReviewButton reviewId={review.id} />
                     <Link href={`/history/${review.id}`} className="btn-outline !px-4 !py-2 text-sm">
                       View Details
                     </Link>
