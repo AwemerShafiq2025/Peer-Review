@@ -45,8 +45,9 @@ function AuthLinks({
         <Link href="/history" className={mobile ? "btn-outline w-full !px-4 !py-2 text-sm" : "btn-outline !px-4 !py-2 text-sm"}>
           History
         </Link>
-        <Link href="/profile" className={mobile ? "btn-outline w-full !px-4 !py-2 text-sm" : "btn-outline !px-4 !py-2 text-sm"}>
-          Profile
+        {/* Profile → Settings */}
+        <Link href="/settings" className={mobile ? "btn-outline w-full !px-4 !py-2 text-sm" : "btn-outline !px-4 !py-2 text-sm"}>
+          Settings
         </Link>
         <form
           action={async () => {
