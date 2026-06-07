@@ -90,6 +90,12 @@ export default function AboutPage() {
             PeerReviewer carry no academic weight and should not be cited or
             used as evidence of peer review.
           </p>
+          <Link
+            href="/terms"
+            className="mt-4 inline-block text-sm text-accent underline-offset-2 hover:underline"
+          >
+            Read full Terms of Service & Privacy Policy →
+          </Link>
         </div>
       </section>
 

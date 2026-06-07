@@ -30,6 +30,26 @@ export async function createTables() {
     END $$;
   `;
 
+  // Add email verification columns if they don't exist
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'email_verified'
+      ) THEN
+        ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE;
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'verification_token'
+      ) THEN
+        ALTER TABLE users ADD COLUMN verification_token TEXT;
+      END IF;
+    END $$;
+  `;
+
   await sql`
     CREATE TABLE IF NOT EXISTS reviews (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

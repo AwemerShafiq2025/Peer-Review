@@ -9,7 +9,11 @@ import { IconGavel, Spinner } from "@/components/icons";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const registered = searchParams.get("registered") === "true";
+  const registered = searchParams?.get("registered") === "true";
+  // ── New params ──
+  const verified = searchParams?.get("verified") === "true";
+  const errorParam = searchParams?.get("error");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,6 +56,22 @@ function LoginForm() {
       {registered && (
         <p className="mb-4 rounded-md bg-accent/10 p-3 text-sm text-accent ring-1 ring-accent/25">
           Account created! Please sign in.
+        </p>
+      )}
+
+      {/* ── Email verified success banner ── */}
+      {verified && (
+        <p className="mb-4 rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-300 ring-1 ring-emerald-400/20">
+          Email verified! You can now sign in.
+        </p>
+      )}
+
+      {/* ── Invalid/expired token error banner ── */}
+      {(errorParam === "invalid-token" || errorParam === "server-error") && (
+        <p className="mb-4 rounded-md bg-rose-500/10 p-3 text-sm text-rose-300 ring-1 ring-rose-400/20">
+          {errorParam === "invalid-token"
+            ? "Invalid or expired verification link. Please register again."
+            : "Something went wrong. Please try again."}
         </p>
       )}
 

@@ -7,6 +7,7 @@ type DbUser = {
   email: string;
   name: string;
   password_hash: string;
+  email_verified: boolean;
 };
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -29,6 +30,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const { compareSync } = await import("bcryptjs");
 
         if (!user || !compareSync(password, user.password_hash)) {
+          return null;
+        }
+
+        // ── Block unverified users ──
+        if (!user.email_verified) {
           return null;
         }
 

@@ -43,6 +43,12 @@ export default function Footer() {
         <div className="border-t border-subtle pt-6 md:border-l md:border-t-0 md:pl-8 md:pt-0">
           <h2 className="text-sm font-semibold text-text-primary">Info</h2>
           <nav className="mt-4 grid gap-3 text-sm text-text-secondary">
+            <Link href="/about" className="transition-colors hover:text-text-primary">
+              About
+            </Link>
+            <Link href="/terms" className="transition-colors hover:text-text-primary">
+              Terms & Privacy
+            </Link>
             <a
               href="https://build.nvidia.com"
               target="_blank"
@@ -51,19 +57,6 @@ export default function Footer() {
             >
               NVIDIA NIM
             </a>
-            {/* ── GitHub link updated ── */}
-            <a
-              href="https://github.com/AwemerShafiq2025/Peer-Review"
-              target="_blank"
-              rel="noreferrer"
-              className="transition-colors hover:text-text-primary"
-            >
-              GitHub
-            </a>
-            {/* ── Disclaimer → About page ── */}
-            <Link href="/about" className="transition-colors hover:text-text-primary">
-              About & Disclaimer
-            </Link>
           </nav>
         </div>
       </div>
@@ -71,7 +64,12 @@ export default function Footer() {
       <div className="border-t border-subtle">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-5 text-xs text-text-tertiary sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 Albatross Technologies. All rights reserved.</p>
-          <p>Reviews are AI-generated for guidance only.</p>
+          <div className="flex gap-4">
+            <Link href="/terms" className="hover:text-text-secondary transition-colors">
+              Terms & Privacy
+            </Link>
+            <p>Reviews are AI-generated for guidance only.</p>
+          </div>
         </div>
       </div>
     </footer>
