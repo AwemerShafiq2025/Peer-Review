@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { hashSync } from "bcryptjs";
 import sql from "@/lib/db";
-import { sendVerificationEmail } from "@/lib/email";
 
 type RegisterBody = {
   name?: unknown;
@@ -46,19 +45,13 @@ export async function POST(req: Request) {
     }
 
     const passwordHash = hashSync(password, 12);
-    // ── Generate verification token ──
-    const verificationToken = crypto.randomUUID();
 
     await sql.query(
-      "INSERT INTO users (name, email, password_hash, email_verified, verification_token) VALUES ($1, $2, $3, $4, $5)",
-      [name, email, passwordHash, false, verificationToken]
+      "INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3)",
+      [name, email, passwordHash]
     );
 
-    // ── Send verification email ──
-    await sendVerificationEmail(email, name, verificationToken);
-
-    // ── Redirect to verify-email page instead of login ──
-    return NextResponse.json({ ok: true, redirect: "/verify-email" });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Registration failed:", error);
 
